@@ -342,6 +342,8 @@ export default function LandingPage() {
                     <p>
                       Your search queries and preferences are used only to generate recommendations. We store anonymized 
                       results to improve the experience, but don't track personal information or share data with third parties.
+                      This app leverages Qloo's privacy-first approach to cultural intelligence—your data is never used for 
+                      advertising or personal tracking.
                     </p>
                   </div>
                   

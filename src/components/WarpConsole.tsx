@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, Calendar, Sparkles, X, Search, RotateCcw } from 'lucide-react';
+import { Rocket, Calendar, Sparkles, X, Search, RotateCcw, User } from 'lucide-react';
+import Confetti from 'react-confetti';
 import { createWarp, searchQlooEntities } from '../lib/supabase';
 import { saveToStorage, loadFromStorage, removeFromStorage, STORAGE_KEYS } from '../lib/storage';
 import { QlooEntity } from '../types';
@@ -254,28 +255,34 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
 export default function WarpConsole() {
   const navigate = useNavigate();
   const [selectedFavorites, setSelectedFavorites] = useState<QlooEntity[]>([]);
+  const [userName, setUserName] = useState('');
   const [targetYear, setTargetYear] = useState(1985);
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     // Load previous inputs from localStorage
     const lastFavorites = loadFromStorage(STORAGE_KEYS.LAST_FAVORITES, []);
+    const lastUserName = loadFromStorage('taste-timewarp-last-username', '');
     const lastYear = loadFromStorage(STORAGE_KEYS.LAST_YEAR, 1985);
     if (Array.isArray(lastFavorites) && lastFavorites.every(f => typeof f === 'object' && f.id)) {
       setSelectedFavorites(lastFavorites);
     } else {
       setSelectedFavorites([]);
     }
+    if (lastUserName) setUserName(lastUserName);
     if (lastYear) setTargetYear(lastYear);
   }, []);
 
   const handleClearAll = () => {
     setSelectedFavorites([]);
+    setUserName('');
     setTargetYear(1985);
     setError('');
     // Clear localStorage
     removeFromStorage(STORAGE_KEYS.LAST_FAVORITES);
+    removeFromStorage('taste-timewarp-last-username');
     removeFromStorage(STORAGE_KEYS.LAST_YEAR);
     removeFromStorage(STORAGE_KEYS.LAST_SEEDS); // Legacy cleanup
     // Focus the search input after clearing
@@ -296,13 +303,32 @@ export default function WarpConsole() {
       return;
     }
     setIsLoading(true);
+    
+    // Play warp sound effect
+    try {
+      const audio = new Audio('/warp-sound.mp3');
+      audio.volume = 0.3;
+      audio.play().catch(() => {
+        // Ignore audio play errors (user interaction required, etc.)
+      });
+    } catch (error) {
+      // Ignore audio errors
+    }
+    
     try {
       // Save inputs to localStorage
       saveToStorage(STORAGE_KEYS.LAST_FAVORITES, selectedFavorites);
+      saveToStorage('taste-timewarp-last-username', userName);
       saveToStorage(STORAGE_KEYS.LAST_YEAR, targetYear);
       const seedNames = selectedFavorites.map(f => f.name);
-      const warpId = await createWarp(seedNames, targetYear);
-      navigate(`/w/${warpId}`);
+      const warpId = await createWarp(seedNames, targetYear, userName);
+      
+      // Show confetti effect
+      setShowConfetti(true);
+      setTimeout(() => {
+        setShowConfetti(false);
+        navigate(`/w/${warpId}`);
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate time-warp');
     } finally {
@@ -312,6 +338,17 @@ export default function WarpConsole() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+      {/* Confetti Effect */}
+      {showConfetti && (
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+          numberOfPieces={200}
+          colors={['#06b6d4', '#0891b2', '#e879f9', '#d946ef', '#f59e0b', '#eab308']}
+        />
+      )}
+      
       {/* Animated background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-transparent to-magenta-500/10" />
@@ -357,6 +394,24 @@ export default function WarpConsole() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
             >
+              {/* User Name Input */}
+              <div>
+                <label className="block text-cyan-300 font-semibold text-sm mb-3 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Your Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Enter your name for personalized results"
+                  className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all"
+                />
+                <div className="mt-2 text-xs text-slate-400">
+                  We'll personalize your cultural context essay with your name
+                </div>
+              </div>
+              
               <QlooSeedSelector
                 selectedFavorites={selectedFavorites}
                 setSelectedFavorites={setSelectedFavorites}

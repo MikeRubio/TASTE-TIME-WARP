@@ -11,6 +11,7 @@ import {
   Share2, 
   RotateCcw,
   ExternalLink,
+  Linkedin,
   Calendar,
   Info
 } from 'lucide-react';
@@ -91,6 +92,12 @@ export default function EraReport() {
     window.open(url, '_blank');
   };
 
+  const shareLinkedIn = () => {
+    const text = `Check out my time-warp to ${warpData?.target_year}! Discovered what my taste would have looked like in a different era using AI and cultural intelligence.`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
@@ -161,14 +168,23 @@ export default function EraReport() {
             <button
               onClick={shareWarp}
               className="p-2 text-slate-400 hover:text-cyan-400 transition-colors"
+              title="Share"
             >
               <Share2 className="w-5 h-5" />
             </button>
             <button
               onClick={shareTwitter}
               className="p-2 text-slate-400 hover:text-cyan-400 transition-colors"
+              title="Share on Twitter/X"
             >
               <ExternalLink className="w-5 h-5" />
+            </button>
+            <button
+              onClick={shareLinkedIn}
+              className="p-2 text-slate-400 hover:text-cyan-400 transition-colors"
+              title="Share on LinkedIn"
+            >
+              <Linkedin className="w-5 h-5" />
             </button>
           </div>
         </motion.div>

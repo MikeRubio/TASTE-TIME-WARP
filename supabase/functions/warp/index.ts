@@ -31,6 +31,7 @@ Deno.serve(async (req)=>{
       });
     }
     const { seeds, target_year } = await req.json();
+    const { user_name } = await req.json();
     if (!seeds || !Array.isArray(seeds) || seeds.length < 1 || seeds.length > 4) {
       return new Response(JSON.stringify({
         error: "Seeds must be an array of 1-4 items"
@@ -73,7 +74,7 @@ Deno.serve(async (req)=>{
     // Continue if at least 1 valid entity found (proceed with those)
     const bundle = await generateRecommendations(validEntities, target_year);
     console.log('[Warp] Generated bundle:', bundle);
-    const essay = await generateEssay(validEntities.map((e)=>e.name), target_year, bundle);
+    const essay = await generateEssay(validEntities.map((e)=>e.name), target_year, bundle, user_name);
     console.log('[Warp] Generated essay:', essay);
     const divergence = calculateDivergence(target_year);
     // Store in Supabase
@@ -248,17 +249,18 @@ async function generateRecommendations(validEntities, target_year) {
   };
 }
 // ---- LLM essay generator (OpenAI)
-async function generateEssay(seeds, target_year, bundle) {
+async function generateEssay(seeds, target_year, bundle, userName) {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
   console.log('[OpenAI] API key present:', !!openaiApiKey);
   
-  if (!openaiApiKey) return getFallbackEssay(target_year);
+  if (!openaiApiKey) return getFallbackEssay(target_year, userName);
   try {
-    console.log('[OpenAI] Generating essay for:', { seeds, target_year, bundle });
-    const prompt = `Write a concise 60-word cultural context essay about ${target_year}. 
+    console.log('[OpenAI] Generating essay for:', { seeds, target_year, bundle, userName });
+    const namePrefix = userName ? `${userName}, in ${target_year}` : `In ${target_year}`;
+    const prompt = `Write a concise 60-word cultural context essay about ${target_year}. ${userName ? `Start with "${namePrefix}, you'd be all about..."` : ''}
 User's favorites: ${seeds.join(', ')}
 Era recommendations: Music: ${bundle.music}, Film: ${bundle.film}, Food: ${bundle.food}, Fashion: ${bundle.fashion}, Travel: ${bundle.travel}
-Focus on the cultural zeitgeist, artistic movements, and lifestyle trends that defined ${target_year}. Be engaging and informative.`;
+Focus on the cultural zeitgeist, artistic movements, and lifestyle trends that defined ${target_year}. Be engaging and ${userName ? 'personal' : 'informative'}.`;
     
     console.log('[OpenAI] Prompt:', prompt);
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -299,10 +301,10 @@ Focus on the cultural zeitgeist, artistic movements, and lifestyle trends that d
       return essay;
     }
     console.log('[OpenAI] No choices in response, using fallback');
-    return getFallbackEssay(target_year);
+    return getFallbackEssay(target_year, userName);
   } catch (error) {
     console.error('OpenAI API error:', error);
-    return getFallbackEssay(target_year);
+    return getFallbackEssay(target_year, userName);
   }
 }
 function calculateDivergence(target_year) {
@@ -331,16 +333,17 @@ function getFallbackForCategory(category, year) {
   const eraData = getFallbackEraData(year);
   return eraData[category] || `${year}s ${category} recommendation`;
 }
-function getFallbackEssay(year) {
+function getFallbackEssay(year, userName) {
   const decade = Math.floor(year / 10) * 10;
+  const namePrefix = userName ? `${userName}, in ${year}` : `The ${year}s`;
   const essays = {
-    1920: "The Roaring Twenties brought jazz revolution, Art Deco elegance, and speakeasy culture. Post-war optimism fueled experimentation in music, fashion, and lifestyle, creating a vibrant era of cultural rebellion and artistic innovation.",
-    1950: "The 1950s epitomized American prosperity and suburban dreams. Rock 'n' roll emerged, Hollywood's Golden Age flourished, and consumer culture exploded with diners, drive-ins, and television transforming entertainment and social habits.",
-    1970: "The 1970s embodied counterculture and disco fever. Folk rock, blockbuster cinema, and ethnic cuisine gained popularity while bell-bottoms and platform shoes defined fashion in this era of social change and musical diversity.",
-    1990: "The 1990s marked alternative culture's mainstream breakthrough. Grunge music, independent films, and fusion cuisine reflected a generation's authenticity-seeking spirit, while minimalist fashion and globalization shaped cultural identity.",
-    2010: "The 2010s witnessed digital revolution's cultural impact. Streaming services, food trucks, and sustainable fashion emerged as social media transformed how we discover, share, and experience music, film, and lifestyle trends."
+    1920: userName ? `${namePrefix}, you'd be all about jazz revolution, Art Deco elegance, and speakeasy culture. Post-war optimism fueled experimentation in music, fashion, and lifestyle, creating a vibrant era of cultural rebellion and artistic innovation.` : "The Roaring Twenties brought jazz revolution, Art Deco elegance, and speakeasy culture. Post-war optimism fueled experimentation in music, fashion, and lifestyle, creating a vibrant era of cultural rebellion and artistic innovation.",
+    1950: userName ? `${namePrefix}, you'd be all about American prosperity and suburban dreams. Rock 'n' roll emerged, Hollywood's Golden Age flourished, and consumer culture exploded with diners, drive-ins, and television transforming entertainment and social habits.` : "The 1950s epitomized American prosperity and suburban dreams. Rock 'n' roll emerged, Hollywood's Golden Age flourished, and consumer culture exploded with diners, drive-ins, and television transforming entertainment and social habits.",
+    1970: userName ? `${namePrefix}, you'd be all about counterculture and disco fever. Folk rock, blockbuster cinema, and ethnic cuisine gained popularity while bell-bottoms and platform shoes defined fashion in this era of social change and musical diversity.` : "The 1970s embodied counterculture and disco fever. Folk rock, blockbuster cinema, and ethnic cuisine gained popularity while bell-bottoms and platform shoes defined fashion in this era of social change and musical diversity.",
+    1990: userName ? `${namePrefix}, you'd be all about alternative culture's mainstream breakthrough. Grunge music, independent films, and fusion cuisine reflected a generation's authenticity-seeking spirit, while minimalist fashion and globalization shaped cultural identity.` : "The 1990s marked alternative culture's mainstream breakthrough. Grunge music, independent films, and fusion cuisine reflected a generation's authenticity-seeking spirit, while minimalist fashion and globalization shaped cultural identity.",
+    2010: userName ? `${namePrefix}, you'd be all about digital revolution's cultural impact. Streaming services, food trucks, and sustainable fashion emerged as social media transformed how we discover, share, and experience music, film, and lifestyle trends.` : "The 2010s witnessed digital revolution's cultural impact. Streaming services, food trucks, and sustainable fashion emerged as social media transformed how we discover, share, and experience music, film, and lifestyle trends."
   };
-  return essays[decade] || `The ${year}s represented a unique cultural moment, blending traditional values with emerging trends across music, cinema, cuisine, fashion, and travel, creating distinctive aesthetic and lifestyle preferences.`;
+  return essays[decade] || (userName ? `${namePrefix}, you'd be experiencing a unique cultural moment, blending traditional values with emerging trends across music, cinema, cuisine, fashion, and travel, creating distinctive aesthetic and lifestyle preferences.` : `The ${year}s represented a unique cultural moment, blending traditional values with emerging trends across music, cinema, cuisine, fashion, and travel, creating distinctive aesthetic and lifestyle preferences.`);
 }
 function getFallbackEraData(year) {
   const eraMap = {

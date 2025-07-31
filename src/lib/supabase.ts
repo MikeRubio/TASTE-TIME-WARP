@@ -39,7 +39,7 @@ export async function searchQlooEntities(query: string) {
 }
 
 // API functions
-export async function createWarp(seeds: string[], target_year: number): Promise<string> {
+export async function createWarp(seeds: string[], target_year: number, userName?: string): Promise<string> {
   try {
   const response = await fetch(`${supabaseUrl}/functions/v1/warp`, {
     method: 'POST',
@@ -47,7 +47,7 @@ export async function createWarp(seeds: string[], target_year: number): Promise<
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${supabaseAnonKey}`,
     },
-    body: JSON.stringify({ seeds, target_year }),
+    body: JSON.stringify({ seeds, target_year, user_name: userName }),
   });
 
   if (!response.ok) {
