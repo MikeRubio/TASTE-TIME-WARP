@@ -163,12 +163,28 @@ async function getQlooInsights(entities, category, year) {
     // Use all entities regardless of type - let Qloo's cross-domain intelligence work
     if (entities.length === 0) return null;
     
+    // Define broader type filters that are more likely to return results
+    const typeFilters = {
+      music: ['urn:entity:artist', 'urn:entity:person'],
+      film: ['urn:entity:movie', 'urn:entity:film'],
+      food: ['urn:entity:place', 'urn:entity:restaurant'],
+      fashion: ['urn:entity:brand'],
+      travel: ['urn:entity:destination', 'urn:entity:place']
+    };
+    
     const params = new URLSearchParams({
       "signal.entities": entities.map((e)=>e.id).join(","),
       "filter.release_year.min": String(Math.max(year - 10, 1900)),
       "filter.release_year.max": String(Math.min(year + 10, 2025)),
       "limit": "5"
     });
+    
+    // Add multiple type filters for better results
+    if (typeFilters[category]) {
+      typeFilters[category].forEach(type => {
+        params.append("filter.type", type);
+      });
+    }
     
     const url = `${QLOO_BASE}/v2/insights?${params.toString()}`;
     console.log(`[Qloo Insights] Insights URL: ${url}`);
@@ -181,6 +197,33 @@ async function getQlooInsights(entities, category, year) {
     if (!r.ok) {
       const errorText = await r.text();
       console.error(`Qloo insights failed for ${category}:`, r.status, errorText);
+      
+      // Try again without type filters as fallback
+      console.log(`[Qloo Insights] Retrying without type filters for ${category}`);
+      const fallbackParams = new URLSearchParams({
+        "signal.entities": entities.map((e)=>e.id).join(","),
+        "filter.release_year.min": String(Math.max(year - 10, 1900)),
+        "filter.release_year.max": String(Math.min(year + 10, 2025)),
+        "limit": "5"
+      });
+      
+      const fallbackUrl = `${QLOO_BASE}/v2/insights?${fallbackParams.toString()}`;
+      const fallbackResponse = await fetch(fallbackUrl, {
+        headers: QLOO_HEADERS
+      });
+      
+      if (!fallbackResponse.ok) {
+        return getFallbackForCategory(category, year);
+      }
+      
+      const fallbackData = await fallbackResponse.json();
+      console.log(`[Qloo Insights] Fallback response data for ${category}:`, fallbackData);
+      
+      if (fallbackData.results && fallbackData.results.entities && fallbackData.results.entities.length > 0) {
+        console.log(`[Qloo Insights] Found fallback recommendation for ${category}:`, fallbackData.results.entities[0].name);
+        return fallbackData.results.entities[0].name;
+      }
+      
       return getFallbackForCategory(category, year);
     }
     
