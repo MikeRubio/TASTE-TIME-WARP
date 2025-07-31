@@ -30,8 +30,7 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    const { seeds, target_year } = await req.json();
-    const { user_name } = await req.json();
+    const { seeds, target_year, user_name } = await req.json();
     if (!seeds || !Array.isArray(seeds) || seeds.length < 1 || seeds.length > 4) {
       return new Response(JSON.stringify({
         error: "Seeds must be an array of 1-4 items"
