@@ -170,19 +170,6 @@ async function getQlooInsights(entities, category, year) {
       "limit": "5"
     });
     
-    // Add category-specific type filter
-    const typeMap = {
-      music: "urn:entity:artist",
-      film: "urn:entity:movie", 
-      food: "urn:entity:place",
-      fashion: "urn:entity:brand",
-      travel: "urn:entity:destination"
-    };
-    
-    if (typeMap[category]) {
-      params.append("filter.type", typeMap[category]);
-    }
-    
     const url = `${QLOO_BASE}/v2/insights?${params.toString()}`;
     console.log(`[Qloo Insights] Insights URL: ${url}`);
     
@@ -194,27 +181,6 @@ async function getQlooInsights(entities, category, year) {
     if (!r.ok) {
       const errorText = await r.text();
       console.error(`Qloo insights failed for ${category}:`, r.status, errorText);
-      // Try without type filter as fallback
-      if (typeMap[category]) {
-        console.log(`[Qloo Insights] Retrying ${category} without type filter`);
-        const fallbackParams = new URLSearchParams({
-          "signal.entities": entities.map((e)=>e.id).join(","),
-          "filter.release_year.min": String(Math.max(year - 10, 1900)),
-          "filter.release_year.max": String(Math.min(year + 10, 2025)),
-          "limit": "5"
-        });
-        
-        const fallbackUrl = `${QLOO_BASE}/v2/insights?${fallbackParams.toString()}`;
-        const fallbackResponse = await fetch(fallbackUrl, { headers: QLOO_HEADERS });
-        
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          if (fallbackData.entities && fallbackData.entities.length > 0) {
-            console.log(`[Qloo Insights] Fallback success for ${category}:`, fallbackData.entities[0].name);
-            return fallbackData.entities[0].name;
-          }
-        }
-      }
       return getFallbackForCategory(category, year);
     }
     
