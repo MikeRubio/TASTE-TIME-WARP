@@ -165,8 +165,8 @@ async function getQlooInsights(entities, category, year) {
     
     const params = new URLSearchParams({
       "signal.entities": entities.map((e)=>e.id).join(","),
-      "filter.release_year.min": String(Math.max(year - 5, 1900)),
-      "filter.release_year.max": String(Math.min(year + 5, 2025)),
+      "filter.release_year.min": String(Math.max(year - 10, 1900)),
+      "filter.release_year.max": String(Math.min(year + 10, 2025)),
       "limit": "5"
     });
     
@@ -199,8 +199,8 @@ async function getQlooInsights(entities, category, year) {
         console.log(`[Qloo Insights] Retrying ${category} without type filter`);
         const fallbackParams = new URLSearchParams({
           "signal.entities": entities.map((e)=>e.id).join(","),
-          "filter.release_year.min": String(Math.max(year - 5, 1900)),
-          "filter.release_year.max": String(Math.min(year + 5, 2025)),
+          "filter.release_year.min": String(Math.max(year - 10, 1900)),
+          "filter.release_year.max": String(Math.min(year + 10, 2025)),
           "limit": "5"
         });
         
