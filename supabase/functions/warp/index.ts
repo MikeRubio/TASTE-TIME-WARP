@@ -31,9 +31,9 @@ Deno.serve(async (req)=>{
       });
     }
     const { entities, target_year, user_name } = await req.json();
-    if (!entities || !Array.isArray(entities) || entities.length < 1 || entities.length > 4) {
+    if (!entities || !Array.isArray(entities) || entities.length < 1 || entities.length > 5) {
       return new Response(JSON.stringify({
-        error: "Entities must be an array of 1-4 items"
+        error: "Entities must be an array of 1-5 items"
       }), {
         status: 400,
         headers: {
