@@ -320,8 +320,7 @@ export default function WarpConsole() {
       saveToStorage(STORAGE_KEYS.LAST_FAVORITES, selectedFavorites);
       saveToStorage('taste-timewarp-last-username', userName);
       saveToStorage(STORAGE_KEYS.LAST_YEAR, targetYear);
-      const seedNames = selectedFavorites.map(f => f.name);
-      const warpId = await createWarp(seedNames, targetYear, userName);
+      const warpId = await createWarp(selectedFavorites, targetYear, userName);
       
       // Show confetti effect
       setShowConfetti(true);

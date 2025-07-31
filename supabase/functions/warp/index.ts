@@ -30,10 +30,10 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    const { seeds, target_year, user_name } = await req.json();
-    if (!seeds || !Array.isArray(seeds) || seeds.length < 1 || seeds.length > 4) {
+    const { entities, target_year, user_name } = await req.json();
+    if (!entities || !Array.isArray(entities) || entities.length < 1 || entities.length > 4) {
       return new Response(JSON.stringify({
-        error: "Seeds must be an array of 1-4 items"
+        error: "Entities must be an array of 1-4 items"
       }), {
         status: 400,
         headers: {
@@ -53,15 +53,18 @@ Deno.serve(async (req)=>{
         }
       });
     }
-    // Qloo entity lookup for each seed
-    const qlooEntities = await Promise.all(seeds.map((seed)=>searchQlooEntity(seed)));
-    const validEntities = qlooEntities.filter((entity)=>entity !== null);
+    // Validate that entities have required fields
+    const validEntities = entities.filter(entity => {
+      if (!entity || typeof entity !== 'object') return false;
+      if (!entity.id || !entity.name) return false;
+      return true;
+    });
     
     console.log('[Warp] Valid entities found:', validEntities.length, validEntities);
     // Error if NO seeds resolve
     if (validEntities.length === 0) {
       return new Response(JSON.stringify({
-        error: "Sorry, none of your favorites could be found in our cultural database. Please try artists, movies, books, or well-known brands."
+        error: "Invalid entity data received. Please try selecting your favorites again."
       }), {
         status: 422,
         headers: {
@@ -80,7 +83,7 @@ Deno.serve(async (req)=>{
     const { data, error } = await supabase.from('warps').insert({
       seeds: validEntities.map((e)=>e.name),
       target_year,
-      bundle,
+        seeds: validEntities.map((e) => e.name), // Still store names for display
       essay,
       divergence
     }).select('id').single();
