@@ -453,7 +453,6 @@ export default function WarpConsole() {
                   />
                 </div>
                 <div className="flex justify-between text-xs text-slate-400 font-mono">
-                <div className="flex justify-between text-xs text-slate-400 font-medium">
                   <span>1900</span>
                   <span>2025</span>
                 </div>
