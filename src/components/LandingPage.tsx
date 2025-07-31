@@ -98,7 +98,7 @@ export default function LandingPage() {
           >
             <div className="flex items-center justify-center gap-3 mb-6">
               <Rocket className="w-12 h-12 text-cyan-400" />
-              <h1 className="text-5xl md:text-7xl font-bold text-cyan-400" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              <h1 className="text-5xl md:text-7xl font-bold text-cyan-400 tracking-wide">
                 TASTE TIME-WARP
               </h1>
               <Rocket className="w-12 h-12 text-cyan-400 scale-x-[-1]" />

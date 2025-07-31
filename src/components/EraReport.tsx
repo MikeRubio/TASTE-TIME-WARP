@@ -153,7 +153,7 @@ export default function EraReport() {
         >
           <button
             onClick={() => navigate('/console')}
-            className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-mono transition-colors"
+            className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             CONSOLE
@@ -200,7 +200,7 @@ export default function EraReport() {
             <div className="bg-slate-900/80 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-6 shadow-2xl">
               {/* Toggle Button */}
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-mono text-cyan-400">
+                <h2 className="text-2xl font-bold text-cyan-400 tracking-wide">
                   {showModern ? '2025 EQUIVALENTS' : `${warpData.target_year} RECOMMENDATIONS`}
                 </h2>
                 <motion.button
@@ -245,7 +245,7 @@ export default function EraReport() {
                         <div className="flex items-center gap-3">
                           <Icon className="w-6 h-6 text-cyan-400" />
                           <div>
-                            <div className="text-cyan-300 font-mono text-sm">{label}</div>
+                            <div className="text-cyan-300 font-semibold text-sm">{label}</div>
                             <div className="text-slate-100 text-lg">{recommendation}</div>
                           </div>
                         </div>

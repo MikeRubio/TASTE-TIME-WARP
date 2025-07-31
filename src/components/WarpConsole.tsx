@@ -375,7 +375,7 @@ export default function WarpConsole() {
             >
               <div className="flex items-center justify-center gap-3 mb-4">
                 <Rocket className="w-8 h-8 text-cyan-400" />
-                <h1 className="text-4xl font-mono font-bold text-cyan-400">
+                <h1 className="text-4xl font-bold text-cyan-400 tracking-wide">
                   TASTE TIME-WARP
                 </h1>
                 <Rocket className="w-8 h-8 text-cyan-400 scale-x-[-1]" />
@@ -420,7 +420,7 @@ export default function WarpConsole() {
               />
               {/* Year Slider */}
               <div>
-                <label className="block text-cyan-300 font-mono text-sm mb-3 flex items-center gap-2">
+                <label className="block text-cyan-300 font-semibold text-sm mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   Jump to any year — <span className="font-bold text-lg text-cyan-400">{targetYear}</span>
                   {selectedFavorites.length > 0 && (
@@ -453,6 +453,7 @@ export default function WarpConsole() {
                   />
                 </div>
                 <div className="flex justify-between text-xs text-slate-400 font-mono">
+                <div className="flex justify-between text-xs text-slate-400 font-medium">
                   <span>1900</span>
                   <span>2025</span>
                 </div>
@@ -462,7 +463,7 @@ export default function WarpConsole() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-red-400 text-sm font-mono bg-red-500/10 border border-red-500/20 rounded-lg p-3"
+                  className="text-red-400 text-sm font-medium bg-red-500/10 border border-red-500/20 rounded-lg p-3"
                 >
                   {error}
                 </motion.div>
@@ -504,7 +505,7 @@ export default function WarpConsole() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7 }}
             >
-              <p className="text-slate-400 font-mono text-sm">
+              <p className="text-slate-400 font-medium text-sm">
                 Powered by <span className="text-cyan-400">Qloo</span> ♥︎ <span className="text-cyan-400">OpenAI</span>
               </p>
             </motion.div>
