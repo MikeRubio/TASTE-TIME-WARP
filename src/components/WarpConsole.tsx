@@ -15,10 +15,29 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(0);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
+  // Get current category being filled
+  const currentCategory = CATEGORY_CONFIGS[currentCategoryIndex];
+  const isComplete = Object.values(selectedCategoryFavorites).filter(Boolean).length === 5;
+
+  // Auto-advance to next empty category when one is filled
+  useEffect(() => {
+    if (isComplete) return;
+    
+    const nextEmptyIndex = CATEGORY_CONFIGS.findIndex(config => 
+      !selectedCategoryFavorites[config.key]
+    );
+    
+    if (nextEmptyIndex !== -1 && nextEmptyIndex !== currentCategoryIndex) {
+      setCurrentCategoryIndex(nextEmptyIndex);
+      setSearchQuery('');
+      setSearchResults([]);
+      setError('');
+    }
+  }, [selectedCategoryFavorites, currentCategoryIndex, isComplete]);
   // Debounced search
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -35,48 +54,36 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
     const timeoutId = setTimeout(async () => {
       try {
         const results = await searchQlooEntities(searchQuery);
-        console.log('[Qloo] API results:', results);
-        console.log('[Qloo] API results type:', typeof results);
-        console.log('[Qloo] API results length:', Array.isArray(results) ? results.length : 'not array');
-        console.log('[Qloo] Current selectedCategoryFavorites:', selectedCategoryFavorites);
 
-        // Patch: Accept both string/object results just in case!
+        // Filter results to only show entities that match the current category
         const filteredResults = Array.isArray(results)
           ? results.filter(result => {
-              console.log('[Qloo] Processing result:', result);
-              
-              // Warn about missing required fields
               if (!result) {
-                console.warn('[Qloo] Null/undefined result found');
                 return false;
               }
               if (!result.id) {
-                console.warn('[Qloo] Result missing ID:', result);
-                // Allow results without ID for now, but generate a temporary one
                 result.id = `temp-${result.name}-${Date.now()}`;
               }
               if (!result.type) {
-                console.warn('[Qloo] Result missing type:', result);
-                // Try to infer type from name or set a more descriptive default
-                if (result.name.toLowerCase().includes('restaurant') || result.name.toLowerCase().includes('grill') || result.name.toLowerCase().includes('bistro') || result.name.toLowerCase().includes('bar')) {
-                  result.type = 'restaurant';
-                } else if (result.name.toLowerCase().includes('airport') || result.name.toLowerCase().includes('hotel') || result.name.toLowerCase().includes('resort')) {
-                  result.type = 'travel';
-                } else if (result.name.toLowerCase().includes('tour') || result.name.toLowerCase().includes('excursion')) {
-                  result.type = 'activity';
-                } else {
-                  result.type = 'place';
-                }
+                result.type = 'unknown';
               }
               
-              // Check for duplicates using both id and name as fallback
+              // Filter by current category type
+              const entityType = result.type.toLowerCase();
+              const matchesCategory = currentCategory.qlooTypes.some(type => 
+                entityType.includes(type.toLowerCase().replace('urn:entity:', ''))
+              );
+              
+              if (!matchesCategory) {
+                return false;
+              }
+              
+              // Check for duplicates
               const allSelected = Object.values(selectedCategoryFavorites).filter(Boolean);
               return !allSelected.some(fav => fav && fav.id === result.id);
             })
           : [];
 
-        console.log('[Qloo] Filtered results:', filteredResults);
-        console.log('[Qloo] Filtered results length:', filteredResults.length);
         setSearchResults(filteredResults);
         setHighlightedIdx(0);
       } catch (e) {
@@ -90,7 +97,7 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
       isCancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [searchQuery, selectedCategoryFavorites]);
+  }, [searchQuery, selectedCategoryFavorites, currentCategory]);
 
   // Click outside closes dropdown
   useEffect(() => {
@@ -126,45 +133,38 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
   };
 
   const addFavorite = (entity) => {
-    const category = mapEntityToCategory(entity);
+    // Since we're filtering by category, we know this entity belongs to the current category
+    const categoryKey = currentCategory.key;
     
-    if (!category) {
-      setError && setError(`Cannot categorize "${entity.name}". Please search for artists, movies, restaurants, brands, or destinations.`);
+    if (selectedCategoryFavorites[categoryKey]) {
+      setError && setError(`You already have a ${currentCategory.label.toLowerCase()} selected. Remove it first to add a new one.`);
       return;
     }
     
-    if (selectedCategoryFavorites[category]) {
-      setError && setError(`You already have a ${getCategoryConfig(category)?.label.toLowerCase()} selected. Remove it first to add a new one.`);
-      return;
-    }
-    
-    // Prevent duplicates using both id and name as fallback
+    // Check for duplicates across all categories
     const allSelected = Object.values(selectedCategoryFavorites).filter(Boolean);
     const isDuplicate = allSelected.some(f => {
       if (!f) return false;
-      // Primary check: by ID
       if (f.id && entity.id && f.id === entity.id) return true;
-      // Fallback check: by name if ID is missing
       if (f.name && entity.name && f.name === entity.name) return true;
       return false;
     });
     
     if (isDuplicate) {
-      setError && setError(`"${entity.name}" is already selected in another category.`);
+      setError && setError(`"${entity.name}" is already selected.`);
       return;
     }
     
     setSelectedCategoryFavorites({
       ...selectedCategoryFavorites,
-      [category]: entity
+      [categoryKey]: entity
     });
     setShowDropdown(false);
-    setActiveCategory(null);
     setTimeout(() => {
       setSearchQuery('');
       setSearchResults([]);
       inputRef.current?.focus();
-    }, 150); // Slight delay so dropdown closes before clearing
+    }, 150);
     setError && setError('');
   };
 
@@ -177,40 +177,41 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  return (
-    <div>
-      <label className="block text-cyan-300 font-mono text-sm mb-3 flex items-center gap-2">
-        <Sparkles className="w-4 h-4" />
-        Pick Your Modern Favorites (One Per Category)
-      </label>
-      <div className="mb-3 text-xs text-slate-400 bg-slate-800/30 border border-slate-700/50 rounded-lg p-3">
-        <span className="font-semibold text-cyan-300">Select one item per category:</span> Choose an artist, movie, restaurant/food, fashion brand, and travel destination you love today. We'll find their era counterparts!
-      </div>
-      
-      {/* Category Selection Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-        {CATEGORY_CONFIGS.map((config) => {
-          const Icon = config.icon;
-          const selected = selectedCategoryFavorites[config.key];
-          return (
-            <div
-              key={config.key}
-              className={`bg-slate-800/30 border rounded-lg p-3 transition-all ${
-                selected 
-                  ? 'border-green-500/50 bg-green-500/10' 
-                  : 'border-slate-700/50 hover:border-cyan-500/30'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm font-medium text-cyan-300">{config.label}</span>
-                {selected && <CheckCircle className="w-4 h-4 text-green-400 ml-auto" />}
-              </div>
-              {selected ? (
+  const goToCategory = (index) => {
+    setCurrentCategoryIndex(index);
+    setSearchQuery('');
+    setSearchResults([]);
+    setError('');
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  if (isComplete) {
+    return (
+      <div>
+        <label className="block text-cyan-300 font-mono text-sm mb-3 flex items-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          All Categories Complete! 🎉
+        </label>
+        
+        {/* Completed Categories Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          {CATEGORY_CONFIGS.map((config, index) => {
+            const Icon = config.icon;
+            const selected = selectedCategoryFavorites[config.key];
+            return (
+              <div
+                key={config.key}
+                className="bg-green-500/10 border border-green-500/50 rounded-lg p-3"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-medium text-green-300">{config.label}</span>
+                  <CheckCircle className="w-4 h-4 text-green-400 ml-auto" />
+                </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-slate-100 font-medium text-sm">{selected.name}</div>
-                    <div className="text-slate-400 text-xs">{selected.type}</div>
+                    <div className="text-slate-100 font-medium text-sm">{selected?.name}</div>
+                    <div className="text-slate-400 text-xs">{selected?.type}</div>
                   </div>
                   <button
                     onClick={() => removeFavorite(config.key)}
@@ -220,12 +221,69 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
                     <X className="w-3 h-3" />
                   </button>
                 </div>
-              ) : (
-                <div className="text-slate-400 text-xs">Not selected</div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="text-center text-slate-300 text-sm">
+          Ready to generate your time-warp! 🚀
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <label className="block text-cyan-300 font-mono text-sm mb-3 flex items-center gap-2">
+        <Sparkles className="w-4 h-4" />
+        Step {currentCategoryIndex + 1}/5: Choose Your {currentCategory.label}
+      </label>
+      
+      {/* Progress indicator */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          {CATEGORY_CONFIGS.map((config, index) => {
+            const Icon = config.icon;
+            const isActive = index === currentCategoryIndex;
+            const isCompleted = selectedCategoryFavorites[config.key];
+            const isPast = index < currentCategoryIndex;
+            
+            return (
+              <button
+                key={config.key}
+                onClick={() => goToCategory(index)}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  isCompleted 
+                    ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                    : isActive
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
+                    : 'bg-slate-800/30 text-slate-400 border border-slate-700/30 hover:border-slate-600/50'
+                }`}
+              >
+                <Icon className="w-3 h-3" />
+                {isCompleted ? <CheckCircle className="w-3 h-3" /> : index + 1}
+              </button>
+            );
+          })}
+        </div>
+        <div className="text-xs text-slate-400">
+          {Object.values(selectedCategoryFavorites).filter(Boolean).length}/5 categories completed
+        </div>
+      </div>
+      
+      {/* Current Category Info */}
+      <div className="mb-4 bg-slate-800/30 border border-slate-700/50 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <currentCategory.icon className="w-5 h-5 text-cyan-400" />
+          <span className="font-semibold text-cyan-300">{currentCategory.label}</span>
+        </div>
+        <div className="text-xs text-slate-400">
+          {currentCategory.key === 'music' && "Search for your favorite artist or band (e.g., Beyoncé, The Beatles, Taylor Swift)"}
+          {currentCategory.key === 'film' && "Search for a movie you love (e.g., Back to the Future, Titanic, Avengers)"}
+          {currentCategory.key === 'food' && "Search for a restaurant or cuisine you enjoy (e.g., McDonald's, Chez Panisse, Italian food)"}
+          {currentCategory.key === 'fashion' && "Search for a fashion brand you like (e.g., Nike, Gucci, Zara)"}
+          {currentCategory.key === 'travel' && "Search for a destination you'd love to visit (e.g., Paris, Tokyo, New York)"}
+        </div>
       </div>
       
       <div className="relative">
@@ -244,13 +302,8 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
             setHighlightedIdx(0);
           }}
           onKeyDown={handleKeyDown}
-          placeholder={
-            Object.values(selectedCategoryFavorites).filter(Boolean).length >= 5
-              ? "All categories filled"
-              : "Search for artists, movies, restaurants, brands, or destinations..."
-          }
-          disabled={Object.values(selectedCategoryFavorites).filter(Boolean).length >= 5}
-          className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl pl-10 pr-4 py-3 text-slate-100 placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          placeholder={currentCategory.placeholder}
+          className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl pl-10 pr-4 py-3 text-slate-100 placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all text-sm"
         />
         {isSearching && (
           <div
@@ -264,7 +317,7 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
           >
             {searchResults.length === 0 && !isSearching && (
               <div className="p-4 text-center text-slate-400">
-                No results found. Try searching for artists, movies, restaurants, brands, or destinations.
+                No {currentCategory.label.toLowerCase()}s found. Try a different search term.
               </div>
             )}
             {searchResults.map((result, idx) => (
@@ -274,7 +327,6 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
                 onMouseEnter={() => setHighlightedIdx(idx)}
                 className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-cyan-500/10 transition-colors border-b border-slate-700/50 last:border-b-0 
                   ${idx === highlightedIdx ? 'bg-cyan-700/30' : ''}`}
-                disabled={Object.values(selectedCategoryFavorites).filter(Boolean).length >= 5}
               >
                 <div>
                   <div className="text-slate-100 font-medium">{result.name}</div>
@@ -288,7 +340,7 @@ function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFa
       {/* Helper Text */}
       <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
         <span>
-          {Object.values(selectedCategoryFavorites).filter(Boolean).length}/5 categories filled
+          Showing only {currentCategory.label.toLowerCase()}s
         </span>
         <span className="text-cyan-400/70">powered by Qloo search</span>
       </div>
