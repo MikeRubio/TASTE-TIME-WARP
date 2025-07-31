@@ -221,6 +221,10 @@ async function getQlooInsights(entities, category, year) {
     const data = await r.json();
     console.log(`[Qloo Insights] Insights response data for ${category}:`, data);
     
+    if (data.results && data.results.entities && data.results.entities.length > 0) {
+      console.log(`[Qloo Insights] Found recommendation for ${category}:`, data.results.entities[0].name);
+      return data.results.entities[0].name;
+    }
     if (data.entities && data.entities.length > 0) {
       console.log(`[Qloo Insights] Found recommendation for ${category}:`, data.entities[0].name);
       return data.entities[0].name;
