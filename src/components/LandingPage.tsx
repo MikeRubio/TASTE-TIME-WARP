@@ -127,23 +127,23 @@ export default function LandingPage() {
               </p>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <button
-                onClick={() => navigate('/console')}
-                className="bg-gradient-to-r from-cyan-500 to-cyan-400 text-slate-900 font-bold py-4 px-8 rounded-xl hover:from-cyan-400 hover:to-cyan-300 transition-all text-lg flex items-center gap-2 group"
-              >
-                TRY TIME-WARP 🚀
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-              <div className="text-slate-400 text-sm">
-                Powered by <span className="text-cyan-400">Qloo</span> ♥︎ <span className="text-cyan-400">OpenAI</span>
-              </div>
-            </motion.div>
-
+<motion.div
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ delay: 0.6 }}
+  className="flex flex-col items-center"
+>
+  <button
+    onClick={() => navigate('/console')}
+    className="bg-gradient-to-r from-cyan-500 to-cyan-400 text-slate-900 font-bold py-4 px-8 rounded-xl hover:from-cyan-400 hover:to-cyan-300 transition-all text-lg flex items-center gap-2 group"
+  >
+    TRY TIME-WARP 🚀
+    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+  </button>
+  <div className="text-slate-400 text-sm mt-2">
+    Powered by <span className="text-cyan-400">Qloo</span> ♥︎ <span className="text-cyan-400">OpenAI</span>
+  </div>
+</motion.div>
             <motion.div
               className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center"
               initial={{ opacity: 0 }}
