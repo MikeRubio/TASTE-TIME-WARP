@@ -157,27 +157,29 @@ async function getQlooInsights(entities, category, year) {
     console.log(`[Qloo Insights] Getting insights for category: ${category}, year: ${year}`);
     console.log(`[Qloo Insights] Input entities:`, entities);
     
-    const typeMap = {
-      music: "urn:entity:artist",
-      film: "urn:entity:movie",
-      food: "urn:entity:place",
-      fashion: "urn:entity:brand",
-      travel: "urn:entity:destination"
-    };
-    const qlooType = typeMap[category] || category;
-    console.log(`[Qloo Insights] Mapped type for ${category}: ${qlooType}`);
+    // Use all entities regardless of type - let Qloo's cross-domain intelligence work
+    if (entities.length === 0) return null;
     
-    const filteredEntities = entities.filter((e) => e.type === qlooType);
-    console.log(`[Qloo Insights] Filtered entities for ${category}:`, filteredEntities);
-    
-    if (filteredEntities.length === 0) return null;
     const params = new URLSearchParams({
-      "signal.entities": filteredEntities.map((e)=>e.id).join(","),
-      "filter.type": qlooType,
+      "signal.entities": entities.map((e)=>e.id).join(","),
       "filter.release_year.min": String(Math.max(year - 5, 1900)),
       "filter.release_year.max": String(Math.min(year + 5, 2025)),
       "limit": "5"
     });
+    
+    // Add category-specific type filter
+    const typeMap = {
+      music: "urn:entity:artist",
+      film: "urn:entity:movie", 
+      food: "urn:entity:place",
+      fashion: "urn:entity:brand",
+      travel: "urn:entity:destination"
+    };
+    
+    if (typeMap[category]) {
+      params.append("filter.type", typeMap[category]);
+    }
+    
     const url = `${QLOO_BASE}/v2/insights?${params.toString()}`;
     console.log(`[Qloo Insights] Insights URL: ${url}`);
     
@@ -189,8 +191,30 @@ async function getQlooInsights(entities, category, year) {
     if (!r.ok) {
       const errorText = await r.text();
       console.error(`Qloo insights failed for ${category}:`, r.status, errorText);
-      return null;
+      // Try without type filter as fallback
+      if (typeMap[category]) {
+        console.log(`[Qloo Insights] Retrying ${category} without type filter`);
+        const fallbackParams = new URLSearchParams({
+          "signal.entities": entities.map((e)=>e.id).join(","),
+          "filter.release_year.min": String(Math.max(year - 5, 1900)),
+          "filter.release_year.max": String(Math.min(year + 5, 2025)),
+          "limit": "5"
+        });
+        
+        const fallbackUrl = `${QLOO_BASE}/v2/insights?${fallbackParams.toString()}`;
+        const fallbackResponse = await fetch(fallbackUrl, { headers: QLOO_HEADERS });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          if (fallbackData.entities && fallbackData.entities.length > 0) {
+            console.log(`[Qloo Insights] Fallback success for ${category}:`, fallbackData.entities[0].name);
+            return fallbackData.entities[0].name;
+          }
+        }
+      }
+      return getFallbackForCategory(category, year);
     }
+    
     const data = await r.json();
     console.log(`[Qloo Insights] Insights response data for ${category}:`, data);
     
@@ -202,11 +226,12 @@ async function getQlooInsights(entities, category, year) {
       console.log(`[Qloo Insights] Found recommendation for ${category}:`, data.results[0].name);
       return data.results[0].name;
     }
+    
     console.log(`[Qloo Insights] No recommendations found for ${category}`);
-    return null;
+    return getFallbackForCategory(category, year);
   } catch (error) {
     console.error(`Error getting Qloo insights for ${category}:`, error);
-    return null;
+    return getFallbackForCategory(category, year);
   }
 }
 // ---- Recommendations bundle
@@ -221,6 +246,9 @@ async function generateRecommendations(validEntities, target_year) {
     getQlooInsights(validEntities, 'fashion', target_year),
     getQlooInsights(validEntities, 'travel', target_year)
   ]);
+  
+  console.log('[Recommendations] Raw results:', { music, film, food, fashion, travel });
+  
   // Modern equivalents (2025)
   const [modernMusic, modernFilm, modernFood, modernFashion, modernTravel] = await Promise.all([
     getQlooInsights(validEntities, 'music', 2025),
@@ -233,11 +261,11 @@ async function generateRecommendations(validEntities, target_year) {
   console.log('[Recommendations] Modern equivalents:', { modernMusic, modernFilm, modernFood, modernFashion, modernTravel });
 
   return {
-    music: music || getFallbackForCategory('music', target_year),
-    film: film || getFallbackForCategory('film', target_year),
-    food: food || getFallbackForCategory('food', target_year),
-    fashion: fashion || getFallbackForCategory('fashion', target_year),
-    travel: travel || getFallbackForCategory('travel', target_year),
+    music: music,
+    film: film,
+    food: food,
+    fashion: fashion,
+    travel: travel,
     modern_equivalents: {
       music: modernMusic || "Taylor Swift - Anti-Hero",
       film: modernFilm || "Everything Everywhere All at Once",
