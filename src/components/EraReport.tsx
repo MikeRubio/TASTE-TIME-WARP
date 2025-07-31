@@ -68,34 +68,63 @@ export default function EraReport() {
   };
 
   const shareWarp = async () => {
-    const url = window.location.href;
+    const url = 'https://taste-time-wrap.netlify.app' + window.location.pathname;
+    const caption = generateShareCaption();
     
     if (navigator.share) {
       try {
         await navigator.share({
           title: `Taste Time-Warp to ${warpData?.target_year}`,
-          text: `Check out my time-warp to ${warpData?.target_year}!`,
+          text: caption,
           url,
         });
       } catch (err) {
         // Fallback to copy
-        navigator.clipboard.writeText(url);
+        navigator.clipboard.writeText(`${caption}\n\n${url}`);
       }
     } else {
-      navigator.clipboard.writeText(url);
+      navigator.clipboard.writeText(`${caption}\n\n${url}`);
     }
   };
 
   const shareTwitter = () => {
-    const text = `Just time-warped my taste to ${warpData?.target_year}! 🚀`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`;
+    const caption = generateShareCaption();
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(caption)}&url=${encodeURIComponent('https://taste-time-wrap.netlify.app' + window.location.pathname)}`;
     window.open(url, '_blank');
   };
 
   const shareLinkedIn = () => {
-    const text = `Check out my time-warp to ${warpData?.target_year}! Discovered what my taste would have looked like in a different era using AI and cultural intelligence.`;
-    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent(text)}`;
+    const caption = generateShareCaption();
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://taste-time-wrap.netlify.app' + window.location.pathname)}&summary=${encodeURIComponent(caption)}`;
     window.open(url, '_blank');
+  };
+
+  const generateShareCaption = () => {
+    if (!warpData) return "Check out my time-warp results! 🚀";
+    
+    const { bundle, target_year } = warpData;
+    
+    // Get 2-3 interesting recommendations to highlight
+    const highlights = [];
+    if (bundle.music) highlights.push(bundle.music);
+    if (bundle.fashion) highlights.push(bundle.fashion);
+    if (bundle.food && highlights.length < 3) highlights.push(bundle.food);
+    if (bundle.travel && highlights.length < 3) highlights.push(bundle.travel);
+    if (bundle.film && highlights.length < 3) highlights.push(bundle.film);
+    
+    // Create a catchy caption
+    const highlightText = highlights.slice(0, 3).join(', ');
+    
+    const captions = [
+      `If I was born in ${target_year}, I'd be into ${highlightText}. What about you? 🚀`,
+      `Just discovered my ${target_year} taste: ${highlightText}! Time-warp yours! ✨`,
+      `My ${target_year} vibe would be ${highlightText}. What's your era? 🎭`,
+      `Turns out in ${target_year}, I'd love ${highlightText}. Try your time-warp! 🌟`,
+      `AI says my ${target_year} taste = ${highlightText}. What would yours be? 🚀`
+    ];
+    
+    // Pick a random caption for variety
+    return captions[Math.floor(Math.random() * captions.length)];
   };
 
   if (isLoading) {
