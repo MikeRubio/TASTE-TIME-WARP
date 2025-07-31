@@ -396,6 +396,11 @@ export default function WarpConsole() {
     
     const selectedEntities = Object.values(selectedCategoryFavorites).filter(Boolean);
     
+    if (selectedEntities.length > 4) {
+      setError('Please select a maximum of 4 favorites. Remove some selections to continue.');
+      return;
+    }
+    
     if (selectedEntities.length === 0) {
       setError('Please select at least one favorite from the search results');
       return;
