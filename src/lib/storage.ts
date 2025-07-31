@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   LAST_SEEDS: 'taste-timewarp-last-seeds', // Legacy - keep for migration
   LAST_FAVORITES: 'taste-timewarp-last-favorites',
+  LAST_CATEGORY_FAVORITES: 'taste-timewarp-last-category-favorites',
   LAST_YEAR: 'taste-timewarp-last-year',
 } as const;
 

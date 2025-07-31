@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, Calendar, Sparkles, X, Search, RotateCcw, User } from 'lucide-react';
+import { Rocket, Calendar, Sparkles, X, Search, RotateCcw, User, CheckCircle } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { createWarp, searchQlooEntities } from '../lib/supabase';
 import { saveToStorage, loadFromStorage, removeFromStorage, STORAGE_KEYS } from '../lib/storage';
-import { QlooEntity } from '../types';
+import { QlooEntity, CategoryFavorites } from '../types';
+import { CATEGORY_CONFIGS, mapEntityToCategory, getCategoryConfig } from '../lib/categoryMapping';
 
-// --- QlooSeedSelector subcomponent ---
-function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setError }) {
+// --- CategorySeedSelector subcomponent ---
+function CategorySeedSelector({ selectedCategoryFavorites, setSelectedCategoryFavorites, error, setError }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -36,7 +38,7 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
         console.log('[Qloo] API results:', results);
         console.log('[Qloo] API results type:', typeof results);
         console.log('[Qloo] API results length:', Array.isArray(results) ? results.length : 'not array');
-        console.log('[Qloo] Current selectedFavorites:', selectedFavorites);
+        console.log('[Qloo] Current selectedCategoryFavorites:', selectedCategoryFavorites);
 
         // Patch: Accept both string/object results just in case!
         const filteredResults = Array.isArray(results)
@@ -68,7 +70,8 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
               }
               
               // Check for duplicates using both id and name as fallback
-              return !selectedFavorites.some(fav => fav && fav.id === result.id);
+              const allSelected = Object.values(selectedCategoryFavorites).filter(Boolean);
+              return !allSelected.some(fav => fav && fav.id === result.id);
             })
           : [];
 
@@ -81,13 +84,13 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
       } finally {
         if (!isCancelled) setIsSearching(false);
       }
-    }, 300);
+    }, 400);
 
     return () => {
       isCancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [searchQuery, selectedFavorites]);
+  }, [searchQuery, selectedCategoryFavorites]);
 
   // Click outside closes dropdown
   useEffect(() => {
@@ -123,10 +126,21 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
   };
 
   const addFavorite = (entity) => {
-    if (selectedFavorites.length >= 4) return;
+    const category = mapEntityToCategory(entity);
+    
+    if (!category) {
+      setError && setError(`Cannot categorize "${entity.name}". Please search for artists, movies, restaurants, brands, or destinations.`);
+      return;
+    }
+    
+    if (selectedCategoryFavorites[category]) {
+      setError && setError(`You already have a ${getCategoryConfig(category)?.label.toLowerCase()} selected. Remove it first to add a new one.`);
+      return;
+    }
     
     // Prevent duplicates using both id and name as fallback
-    const isDuplicate = selectedFavorites.some(f => {
+    const allSelected = Object.values(selectedCategoryFavorites).filter(Boolean);
+    const isDuplicate = allSelected.some(f => {
       if (!f) return false;
       // Primary check: by ID
       if (f.id && entity.id && f.id === entity.id) return true;
@@ -136,12 +150,16 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
     });
     
     if (isDuplicate) {
-      console.log('[Qloo] Duplicate entity detected:', entity);
+      setError && setError(`"${entity.name}" is already selected in another category.`);
       return;
     }
     
-    setSelectedFavorites([...selectedFavorites, entity]);
+    setSelectedCategoryFavorites({
+      ...selectedCategoryFavorites,
+      [category]: entity
+    });
     setShowDropdown(false);
+    setActiveCategory(null);
     setTimeout(() => {
       setSearchQuery('');
       setSearchResults([]);
@@ -150,8 +168,11 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
     setError && setError('');
   };
 
-  const removeFavorite = (entityId) => {
-    setSelectedFavorites(selectedFavorites.filter(f => f && f.id !== entityId));
+  const removeFavorite = (categoryKey) => {
+    setSelectedCategoryFavorites({
+      ...selectedCategoryFavorites,
+      [categoryKey]: undefined
+    });
     setError && setError('');
     setTimeout(() => inputRef.current?.focus(), 100);
   };
@@ -160,28 +181,53 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
     <div>
       <label className="block text-cyan-300 font-mono text-sm mb-3 flex items-center gap-2">
         <Sparkles className="w-4 h-4" />
-        Pick Your Modern Favorites
+        Pick Your Modern Favorites (One Per Category)
       </label>
       <div className="mb-3 text-xs text-slate-400 bg-slate-800/30 border border-slate-700/50 rounded-lg p-3">
-        <span className="font-semibold text-cyan-300">What are 'Favorites'?</span> — Songs, films, food, brands, or destinations you love today. We'll find their era counterparts!
+        <span className="font-semibold text-cyan-300">Select one item per category:</span> Choose an artist, movie, restaurant/food, fashion brand, and travel destination you love today. We'll find their era counterparts!
       </div>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {selectedFavorites.map((favorite) => (
-          <div
-            key={favorite.id}
-            className="bg-cyan-500/20 border border-cyan-500/40 rounded-full px-3 py-1 flex items-center gap-2 text-sm"
-          >
-            <span className="text-cyan-100">{favorite.name}</span>
-            <span className="text-cyan-300/70 text-xs">({favorite.type})</span>
-            <button
-              onClick={() => removeFavorite(favorite.id)}
-              className="text-cyan-300 hover:text-red-400 transition-colors"
+      
+      {/* Category Selection Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        {CATEGORY_CONFIGS.map((config) => {
+          const Icon = config.icon;
+          const selected = selectedCategoryFavorites[config.key];
+          return (
+            <div
+              key={config.key}
+              className={`bg-slate-800/30 border rounded-lg p-3 transition-all ${
+                selected 
+                  ? 'border-green-500/50 bg-green-500/10' 
+                  : 'border-slate-700/50 hover:border-cyan-500/30'
+              }`}
             >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center gap-2 mb-2">
+                <Icon className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-medium text-cyan-300">{config.label}</span>
+                {selected && <CheckCircle className="w-4 h-4 text-green-400 ml-auto" />}
+              </div>
+              {selected ? (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-slate-100 font-medium text-sm">{selected.name}</div>
+                    <div className="text-slate-400 text-xs">{selected.type}</div>
+                  </div>
+                  <button
+                    onClick={() => removeFavorite(config.key)}
+                    className="text-slate-400 hover:text-red-400 transition-colors p-1"
+                    title="Remove"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="text-slate-400 text-xs">Not selected</div>
+              )}
+            </div>
+          );
+        })}
       </div>
+      
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
@@ -199,12 +245,12 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
           }}
           onKeyDown={handleKeyDown}
           placeholder={
-            selectedFavorites.length >= 4
-              ? "Maximum 4 favorites selected"
-              : "Choose up to 4 favorites—artists, movies, food, brands, or places you love."
+            Object.values(selectedCategoryFavorites).filter(Boolean).length >= 5
+              ? "All categories filled"
+              : "Search for artists, movies, restaurants, brands, or destinations..."
           }
-          disabled={selectedFavorites.length >= 4}
-          className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl pl-10 pr-4 py-3 text-slate-100 placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={Object.values(selectedCategoryFavorites).filter(Boolean).length >= 5}
+          className="w-full bg-slate-800/50 border border-cyan-500/30 rounded-xl pl-10 pr-4 py-3 text-slate-100 placeholder-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
         />
         {isSearching && (
           <div
@@ -218,7 +264,7 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
           >
             {searchResults.length === 0 && !isSearching && (
               <div className="p-4 text-center text-slate-400">
-                No results found. Try searching for artists, movies, restaurants, brands, or places.
+                No results found. Try searching for artists, movies, restaurants, brands, or destinations.
               </div>
             )}
             {searchResults.map((result, idx) => (
@@ -228,7 +274,7 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
                 onMouseEnter={() => setHighlightedIdx(idx)}
                 className={`w-full px-4 py-3 text-left flex items-center justify-between hover:bg-cyan-500/10 transition-colors border-b border-slate-700/50 last:border-b-0 
                   ${idx === highlightedIdx ? 'bg-cyan-700/30' : ''}`}
-                disabled={selectedFavorites.length >= 4}
+                disabled={Object.values(selectedCategoryFavorites).filter(Boolean).length >= 5}
               >
                 <div>
                   <div className="text-slate-100 font-medium">{result.name}</div>
@@ -241,7 +287,9 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
       </div>
       {/* Helper Text */}
       <div className="mt-2 text-xs text-slate-400 flex items-center justify-between">
-        <span>Choose up to 4 favorites—artists, movies, food, brands, or places you love.</span>
+        <span>
+          {Object.values(selectedCategoryFavorites).filter(Boolean).length}/5 categories filled
+        </span>
         <span className="text-cyan-400/70">powered by Qloo search</span>
       </div>
       {error && (
@@ -254,7 +302,7 @@ function QlooSeedSelector({ selectedFavorites, setSelectedFavorites, error, setE
 // --- Main WarpConsole Component ---
 export default function WarpConsole() {
   const navigate = useNavigate();
-  const [selectedFavorites, setSelectedFavorites] = useState<QlooEntity[]>([]);
+  const [selectedCategoryFavorites, setSelectedCategoryFavorites] = useState<CategoryFavorites>({});
   const [userName, setUserName] = useState('');
   const [targetYear, setTargetYear] = useState(1985);
   const [isLoading, setIsLoading] = useState(false);
@@ -263,25 +311,24 @@ export default function WarpConsole() {
 
   useEffect(() => {
     // Load previous inputs from localStorage
-    const lastFavorites = loadFromStorage(STORAGE_KEYS.LAST_FAVORITES, []);
+    const lastCategoryFavorites = loadFromStorage(STORAGE_KEYS.LAST_CATEGORY_FAVORITES, {});
     const lastUserName = loadFromStorage('taste-timewarp-last-username', '');
     const lastYear = loadFromStorage(STORAGE_KEYS.LAST_YEAR, 1985);
-    if (Array.isArray(lastFavorites) && lastFavorites.every(f => typeof f === 'object' && f.id)) {
-      setSelectedFavorites(lastFavorites);
-    } else {
-      setSelectedFavorites([]);
+    
+    if (typeof lastCategoryFavorites === 'object' && lastCategoryFavorites !== null) {
+      setSelectedCategoryFavorites(lastCategoryFavorites);
     }
     if (lastUserName) setUserName(lastUserName);
     if (lastYear) setTargetYear(lastYear);
   }, []);
 
   const handleClearAll = () => {
-    setSelectedFavorites([]);
+    setSelectedCategoryFavorites({});
     setUserName('');
     setTargetYear(1985);
     setError('');
     // Clear localStorage
-    removeFromStorage(STORAGE_KEYS.LAST_FAVORITES);
+    removeFromStorage(STORAGE_KEYS.LAST_CATEGORY_FAVORITES);
     removeFromStorage('taste-timewarp-last-username');
     removeFromStorage(STORAGE_KEYS.LAST_YEAR);
     removeFromStorage(STORAGE_KEYS.LAST_SEEDS); // Legacy cleanup
@@ -294,14 +341,14 @@ export default function WarpConsole() {
 
   const handleWarp = async () => {
     setError('');
-    if (selectedFavorites.length === 0) {
+    
+    const selectedEntities = Object.values(selectedCategoryFavorites).filter(Boolean);
+    
+    if (selectedEntities.length === 0) {
       setError('Please select at least one favorite from the search results');
       return;
     }
-    if (selectedFavorites.length > 4) {
-      setError('Please select no more than 4 favorites');
-      return;
-    }
+    
     setIsLoading(true);
     
     // Play warp sound effect
@@ -317,10 +364,10 @@ export default function WarpConsole() {
     
     try {
       // Save inputs to localStorage
-      saveToStorage(STORAGE_KEYS.LAST_FAVORITES, selectedFavorites);
+      saveToStorage(STORAGE_KEYS.LAST_CATEGORY_FAVORITES, selectedCategoryFavorites);
       saveToStorage('taste-timewarp-last-username', userName);
       saveToStorage(STORAGE_KEYS.LAST_YEAR, targetYear);
-      const warpId = await createWarp(selectedFavorites, targetYear, userName);
+      const warpId = await createWarp(selectedEntities, targetYear, userName);
       
       // Show confetti effect
       setShowConfetti(true);
@@ -411,9 +458,9 @@ export default function WarpConsole() {
                 </div>
               </div>
               
-              <QlooSeedSelector
-                selectedFavorites={selectedFavorites}
-                setSelectedFavorites={setSelectedFavorites}
+              <CategorySeedSelector
+                selectedCategoryFavorites={selectedCategoryFavorites}
+                setSelectedCategoryFavorites={setSelectedCategoryFavorites}
                 error={error}
                 setError={setError}
               />
@@ -422,7 +469,7 @@ export default function WarpConsole() {
                 <label className="block text-cyan-300 font-semibold text-sm mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   Jump to any year — <span className="font-bold text-lg text-cyan-400">{targetYear}</span>
-                  {selectedFavorites.length > 0 && (
+                  {Object.values(selectedCategoryFavorites).filter(Boolean).length > 0 && (
                     <button
                       onClick={handleClearAll}
                       className="ml-auto text-xs text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1"

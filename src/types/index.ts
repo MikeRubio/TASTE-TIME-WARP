@@ -33,3 +33,19 @@ export interface QlooEntity {
   name: string;
   type: string;
 }
+
+export interface CategoryFavorites {
+  music?: QlooEntity;
+  film?: QlooEntity;
+  food?: QlooEntity;
+  fashion?: QlooEntity;
+  travel?: QlooEntity;
+}
+
+export interface CategoryConfig {
+  key: keyof CategoryFavorites;
+  label: string;
+  icon: any;
+  placeholder: string;
+  qlooTypes: string[];
+}
