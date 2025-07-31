@@ -83,7 +83,7 @@ Deno.serve(async (req)=>{
     const { data, error } = await supabase.from('warps').insert({
       seeds: validEntities.map((e)=>e.name),
       target_year,
-        seeds: validEntities.map((e) => e.name), // Still store names for display
+      bundle,
       essay,
       divergence
     }).select('id').single();
